@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint skills
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v4 (Renovate pins the digest — helpers:pinGitHubActionDigests)
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Shellcheck bundled scripts
+        run: |
+          mapfile -t scripts < <(find skills -type f -name '*.sh')
+          if [ ${#scripts[@]} -eq 0 ]; then echo "no scripts to check"; exit 0; fi
+          printf 'checking:\n'; printf '  %s\n' "${scripts[@]}"
+          shellcheck "${scripts[@]}"
+
+      - name: Validate SKILL.md frontmatter
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r f; do
+            dir="$(basename "$(dirname "$f")")"
+            # frontmatter must be the first block, delimited by --- ... ---
+            if [ "$(head -1 "$f")" != "---" ]; then
+              echo "::error file=$f::missing YAML frontmatter (must start with ---)"; fail=1; continue
+            fi
+            fm="$(awk 'NR==1{next} /^---[[:space:]]*$/{exit} {print}' "$f")"
+            name="$(printf '%s\n' "$fm" | sed -n 's/^name:[[:space:]]*//p' | head -1)"
+            desc="$(printf '%s\n' "$fm" | sed -n 's/^description:[[:space:]]*//p' | head -1)"
+            [ -n "$name" ] || { echo "::error file=$f::frontmatter missing 'name:'"; fail=1; }
+            [ -n "$desc" ] || { echo "::error file=$f::frontmatter missing 'description:'"; fail=1; }
+            if [ -n "$name" ] && [ "$name" != "$dir" ]; then
+              echo "::error file=$f::name '$name' must match folder '$dir'"; fail=1
+            fi
+            if ! printf '%s' "$name" | grep -Eq '^[a-z0-9]+(-[a-z0-9]+)*$'; then
+              echo "::error file=$f::name '$name' must be lowercase-kebab-case"; fail=1
+            fi
+            echo "ok: $f (name=$name)"
+          done < <(find skills -type f -name 'SKILL.md')
+          exit "$fail"

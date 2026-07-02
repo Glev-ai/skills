@@ -1,0 +1,17 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Python bytecode (skills may bundle Python helpers)
+__pycache__/
+*.py[cod]
+
+# scratch / local skill test output (root-level only — anchored so they don't
+# match skill folders like skills/glev-continuous-autofix/)
+*.log
+/tmp-*
+/glev-autofix-*/
+/glev-continuous-*/
